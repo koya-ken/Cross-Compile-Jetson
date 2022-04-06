@@ -3,34 +3,45 @@
 sudo cp /usr/bin/qemu-arm-static usr/bin/
 sudo cp /usr/bin/qemu-aarch64-static usr/bin/
 
+# https://unix.stackexchange.com/questions/120827/recursive-umount-after-rbind-mount
+# https://matsuu.hatenablog.com/entry/20101225/1293262061
+# https://qiita.com/ngyuki/items/a9cff2ba3fceb97d18ec
+
 function mnt() {
+    MOUNT_POINT=$(readlink -f ${2})/
     echo "MOUNTING"
-    sudo mount -t proc /proc ${2}proc
-    sudo mount -t sysfs /sys ${2}sys    
-    sudo mount -o bind /dev ${2}dev
-    sudo mount -o bind /run ${2}run 
-    #sudo mount --bind / ${2}host
-    #sudo mount -vt tmpfs shm ${2}dev/shm
-    #sudo mount -t /dev/shm ${2}dev/shm
-    sudo chroot ${2}
+    sudo mount  --rbind /dev ${MOUNT_POINT}dev/
+    sudo mount -t proc none ${MOUNT_POINT}proc
+    sudo mount  --rbind /sys ${MOUNT_POINT}sys/
+    sudo mount --make-rslave ${MOUNT_POINT}dev/
+    sudo mount --make-rslave ${MOUNT_POINT}proc
+    sudo mount --make-rslave ${MOUNT_POINT}sys
+
+    LC_ALL=C LANG=C sudo chroot ${MOUNT_POINT}
 }
 
 function umnt() {
+    MOUNT_POINT=$(readlink -f ${2})/
     echo "UNMOUNTING"
-    sudo umount ${2}proc
-    sudo umount ${2}sys
-    #sudo umount ${2}dev/shm
-    sudo umount ${2}dev
-    sudo umount ${2}run
-    #sudo umount ${2}host
+    sudo umount -R ${MOUNT_POINT}dev/
+    sudo umount -R ${MOUNT_POINT}proc
+    sudo umount -R ${MOUNT_POINT}sys
 }
 
+if [ "$1" == "-m" ] && [ -n "$2" ] && (cat /proc/mounts | grep ${2} >/dev/null) ; then
+    echo $2 is mounted.
+    echo $2 please unmount
+    sudo chroot $2
+    exit 1
+fi
 
 if [ "$1" == "-m" ] && [ -n "$2" ] ;
 then
+:
     mnt $1 $2
 elif [ "$1" == "-u" ] && [ -n "$2" ];
 then
+:
     umnt $1 $2
 else
     echo ""
